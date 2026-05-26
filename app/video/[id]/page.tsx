@@ -1,28 +1,72 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Share2, MoreHorizontal, Download } from "lucide-react";
+import { ArrowLeft, Share2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import VideoPlayer from "@/components/video-player";
 import CommentSidebar from "@/components/comment-sidebar";
 import TimelineMarkers from "@/components/timeline-markers";
 import { useVideoPlayer } from "@/hooks/use-video-player";
 import { MOCK_VIDEOS, MOCK_COMMENTS, CURRENT_USER } from "@/lib/mock-data";
-import { Comment } from "@/types";
+import { Comment, Video } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 export default function VideoReviewPage() {
   const params = useParams();
   const router = useRouter();
   const videoId = params.id as string;
 
-  const video = MOCK_VIDEOS.find((v) => v.id === videoId);
-  const initialComments = MOCK_COMMENTS.filter((c) => c.videoId === videoId);
-
-  const [comments, setComments] = useState<Comment[]>(initialComments);
+  const [video, setVideo] = useState<Video | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const player = useVideoPlayer();
+
+  useEffect(() => {
+    async function loadVideo() {
+      try {
+        // Try searching in MOCK_VIDEOS first
+        const mockVideo = MOCK_VIDEOS.find((v) => v.id === videoId);
+        if (mockVideo) {
+          setVideo(mockVideo);
+          const initialComments = MOCK_COMMENTS.filter((c) => c.videoId === videoId);
+          setComments(initialComments);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch from Supabase
+        const { data, error } = await supabase
+          .from("videos")
+          .select("*")
+          .eq("id", videoId)
+          .maybeSingle();
+
+        if (error) {
+          console.warn("Could not fetch video from Supabase:", error.message);
+        } else if (data) {
+          setVideo({
+            id: data.id,
+            title: data.title,
+            description: data.description || "",
+            thumbnailUrl: data.thumbnail_url || data.thumbnailUrl || "",
+            videoUrl: data.video_url || data.videoUrl || "",
+            duration: data.duration || 0,
+            createdAt: data.created_at || data.createdAt || new Date().toISOString(),
+            commentsCount: data.comments_count || data.commentsCount || 0,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load video:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadVideo();
+  }, [videoId]);
 
   const handleAddComment = (content: string, timestamp: number | null) => {
     const newComment: Comment = {
@@ -37,6 +81,17 @@ export default function VideoReviewPage() {
     };
     setComments((prev) => [...prev, newComment]);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent mx-auto mb-4" />
+          <p className="text-sm text-zinc-400">Loading video details...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!video) {
     return (

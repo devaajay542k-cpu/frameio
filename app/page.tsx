@@ -1,16 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/navbar";
 import Sidebar from "@/components/sidebar";
 import VideoCard from "@/components/video-card";
 import UploadModal from "@/components/upload-modal";
-import { MOCK_VIDEOS } from "@/lib/mock-data";
 import { Film, LayoutGrid, List } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { Video } from "@/types";
+
+interface DatabaseVideo {
+  id: string;
+  title: string;
+  description?: string;
+  thumbnail_url?: string;
+  thumbnailUrl?: string;
+  video_url?: string;
+  videoUrl?: string;
+  duration?: number;
+  created_at?: string;
+  createdAt?: string;
+  comments_count?: number;
+  commentsCount?: number;
+}
 
 export default function DashboardPage() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [videos, setVideos] = useState<Video[]>([]);
+
+  useEffect(() => {
+    async function fetchVideos() {
+      try {
+        const { data, error } = await supabase
+          .from("videos")
+          .select("*");
+        console.log(data);
+        console.log(error);
+        if (error) {
+          console.warn("Could not fetch videos from Supabase:", error.message);
+          return;
+        }
+
+        if (data) {
+          const mappedVideos: Video[] = (data as unknown as DatabaseVideo[]).map((item) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description || "",
+            thumbnailUrl: item.thumbnail_url || item.thumbnailUrl || "",
+            videoUrl: item.video_url || item.videoUrl || "",
+            duration: item.duration || 0,
+            createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+            commentsCount: item.comments_count || item.commentsCount || 0,
+          }));
+          setVideos(mappedVideos);
+        }
+      } catch (err) {
+        console.error("Error fetching videos from Supabase:", err);
+      }
+    }
+
+    fetchVideos();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#09090b]">
@@ -44,7 +95,7 @@ export default function DashboardPage() {
               <div>
                 <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">My Projects</h1>
                 <p className="text-sm text-zinc-500 mt-1">
-                  {MOCK_VIDEOS.length} video{MOCK_VIDEOS.length !== 1 ? "s" : ""} in your workspace
+                  {videos.length} video{videos.length !== 1 ? "s" : ""} in your workspace
                 </p>
               </div>
 
@@ -59,9 +110,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Video Grid */}
-            {MOCK_VIDEOS.length > 0 ? (
+            {videos.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
-                {MOCK_VIDEOS.map((video) => (
+                {videos.map((video) => (
                   <VideoCard key={video.id} video={video} />
                 ))}
               </div>
