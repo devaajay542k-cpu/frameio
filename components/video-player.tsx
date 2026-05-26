@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   SkipBack, SkipForward, Settings,
@@ -70,18 +70,52 @@ export default function VideoPlayer({
     }
   };
 
-  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pct = ((e.clientX - rect.left) / rect.width) * 100;
-    seekPercent(Math.max(0, Math.min(100, pct)));
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleTimelineDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!timelineRef.current || duration === 0) return;
+    setIsDragging(true);
+
+    const rect = timelineRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const seekTime = Math.max(0, Math.min((clickX / rect.width) * duration, duration));
+    seek(seekTime);
   };
 
   const handleTimelineHover = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isDragging || !timelineRef.current || duration === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = (e.clientX - rect.left) / rect.width;
     setHoverTime(pct * duration);
     setHoverX(e.clientX - rect.left);
   };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!timelineRef.current || duration === 0) return;
+      const rect = timelineRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const seekTime = Math.max(0, Math.min((clickX / rect.width) * duration, duration));
+      seek(seekTime);
+      setHoverTime(seekTime);
+      setHoverX(Math.max(0, Math.min(e.clientX - rect.left, rect.width)));
+    };
+
+    const handleGlobalMouseUp = () => {
+      setIsDragging(false);
+      setHoverTime(null);
+    };
+
+    window.addEventListener("mousemove", handleGlobalMouseMove);
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleGlobalMouseMove);
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [isDragging, duration, seek]);
 
   const timestampComments = comments.filter((c) => c.timestamp !== null);
 
@@ -100,17 +134,18 @@ export default function VideoPlayer({
         preload="metadata"
       />
 
-      {/* Large center play button when paused */}
-      {!isPlaying && (
-        <div
-          className="absolute inset-0 flex items-center justify-center cursor-pointer z-10"
-          onClick={togglePlay}
-        >
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl transition-transform duration-300 hover:scale-110">
-            <Play className="h-9 w-9 text-white fill-white ml-1" />
-          </div>
+      {/* Cinematic Center Play Overlay */}
+      <div
+        className={cn(
+          "absolute inset-0 flex items-center justify-center cursor-pointer z-10 transition-all duration-300 bg-black/20",
+          isPlaying ? "opacity-0 pointer-events-none scale-95" : "opacity-100 scale-100"
+        )}
+        onClick={togglePlay}
+      >
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl transition-all duration-300 hover:scale-110 hover:bg-white/20">
+          <Play className="h-9 w-9 text-white fill-white ml-1" />
         </div>
-      )}
+      </div>
 
       {/* Controls Overlay */}
       <div
@@ -122,13 +157,16 @@ export default function VideoPlayer({
         {/* Timeline Scrubber */}
         <div
           ref={timelineRef}
-          className="relative w-full h-6 flex items-end cursor-pointer group/timeline mb-2"
-          onClick={handleTimelineClick}
+          className="relative w-full h-6 flex items-end cursor-pointer group/timeline mb-2 select-none"
+          onMouseDown={handleTimelineDown}
           onMouseMove={handleTimelineHover}
-          onMouseLeave={() => setHoverTime(null)}
+          onMouseLeave={() => !isDragging && setHoverTime(null)}
         >
           {/* Track Background */}
-          <div className="absolute bottom-2 left-0 right-0 h-1 bg-zinc-700/60 rounded-full group-hover/timeline:h-1.5 transition-all duration-150">
+          <div className={cn(
+            "absolute bottom-2 left-0 right-0 h-1 bg-zinc-700/60 rounded-full transition-all duration-150 w-full",
+            (isDragging || hoverTime !== null) ? "h-1.5" : "group-hover/timeline:h-1.5"
+          )}>
             {/* Buffered */}
             <div
               className="absolute top-0 left-0 h-full bg-zinc-600/50 rounded-full"
@@ -141,7 +179,10 @@ export default function VideoPlayer({
             />
             {/* Scrub Head */}
             <div
-              className="absolute top-1/2 -translate-y-1/2 h-3 w-3 bg-indigo-400 rounded-full border-2 border-white shadow-md opacity-0 group-hover/timeline:opacity-100 transition-opacity"
+              className={cn(
+                "absolute top-1/2 -translate-y-1/2 h-3 w-3 bg-indigo-400 rounded-full border-2 border-white shadow-md transition-all duration-150",
+                (isDragging || hoverTime !== null) ? "opacity-100 scale-125" : "opacity-0 group-hover/timeline:opacity-100"
+              )}
               style={{ left: `${progress}%`, transform: `translateX(-50%) translateY(-50%)` }}
             />
           </div>

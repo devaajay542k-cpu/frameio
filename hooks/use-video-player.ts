@@ -23,6 +23,7 @@ interface UseVideoPlayerReturn {
 
 export function useVideoPlayer(): UseVideoPlayerReturn {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -32,46 +33,63 @@ export function useVideoPlayer(): UseVideoPlayerReturn {
   const [playbackRate, setPlaybackRateState] = useState(1);
   const [buffered, setBuffered] = useState(0);
 
+  // Sync ref to state to force-trigger bindings when video enters the DOM
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    if (videoRef.current !== videoElement) {
+      setVideoElement(videoRef.current);
+    }
+  });
 
-    const onTimeUpdate = () => setCurrentTime(video.currentTime);
-    const onDurationChange = () => setDuration(video.duration || 0);
-    const onLoadedMetadata = () => setDuration(video.duration || 0);
+  useEffect(() => {
+    if (!videoElement) return;
+
+    const onTimeUpdate = () => setCurrentTime(videoElement.currentTime);
+    const onDurationChange = () => setDuration(videoElement.duration || 0);
+    const onLoadedMetadata = () => setDuration(videoElement.duration || 0);
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onEnded = () => setIsPlaying(false);
     const onProgress = () => {
-      if (video.buffered.length > 0) {
-        setBuffered(video.buffered.end(video.buffered.length - 1));
+      if (videoElement.buffered.length > 0) {
+        setBuffered(videoElement.buffered.end(videoElement.buffered.length - 1));
       }
     };
     const onVolumeChange = () => {
-      setVolumeState(video.volume);
-      setIsMuted(video.muted);
+      setVolumeState(videoElement.volume);
+      setIsMuted(videoElement.muted);
     };
 
-    video.addEventListener("timeupdate", onTimeUpdate);
-    video.addEventListener("durationchange", onDurationChange);
-    video.addEventListener("loadedmetadata", onLoadedMetadata);
-    video.addEventListener("play", onPlay);
-    video.addEventListener("pause", onPause);
-    video.addEventListener("ended", onEnded);
-    video.addEventListener("progress", onProgress);
-    video.addEventListener("volumechange", onVolumeChange);
+    // Sync initial state values
+    setIsPlaying(!videoElement.paused);
+    setDuration(videoElement.duration || 0);
+    setCurrentTime(videoElement.currentTime || 0);
+    setVolumeState(videoElement.volume);
+    setIsMuted(videoElement.muted);
+    videoElement.playbackRate = playbackRate;
+    if (videoElement.buffered.length > 0) {
+      setBuffered(videoElement.buffered.end(videoElement.buffered.length - 1));
+    }
+
+    videoElement.addEventListener("timeupdate", onTimeUpdate);
+    videoElement.addEventListener("durationchange", onDurationChange);
+    videoElement.addEventListener("loadedmetadata", onLoadedMetadata);
+    videoElement.addEventListener("play", onPlay);
+    videoElement.addEventListener("pause", onPause);
+    videoElement.addEventListener("ended", onEnded);
+    videoElement.addEventListener("progress", onProgress);
+    videoElement.addEventListener("volumechange", onVolumeChange);
 
     return () => {
-      video.removeEventListener("timeupdate", onTimeUpdate);
-      video.removeEventListener("durationchange", onDurationChange);
-      video.removeEventListener("loadedmetadata", onLoadedMetadata);
-      video.removeEventListener("play", onPlay);
-      video.removeEventListener("pause", onPause);
-      video.removeEventListener("ended", onEnded);
-      video.removeEventListener("progress", onProgress);
-      video.removeEventListener("volumechange", onVolumeChange);
+      videoElement.removeEventListener("timeupdate", onTimeUpdate);
+      videoElement.removeEventListener("durationchange", onDurationChange);
+      videoElement.removeEventListener("loadedmetadata", onLoadedMetadata);
+      videoElement.removeEventListener("play", onPlay);
+      videoElement.removeEventListener("pause", onPause);
+      videoElement.removeEventListener("ended", onEnded);
+      videoElement.removeEventListener("progress", onProgress);
+      videoElement.removeEventListener("volumechange", onVolumeChange);
     };
-  }, []);
+  }, [videoElement]);
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;

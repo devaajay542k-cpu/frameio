@@ -29,9 +29,9 @@ export default function TimelineMarkers({ comments, duration, onSeek }: Timeline
         </span>
       </div>
 
-      <div className="relative w-full h-8 bg-zinc-900/60 rounded-lg border border-zinc-800/60 overflow-hidden">
+      <div className="relative w-full h-8 bg-zinc-900/60 rounded-lg border border-zinc-800/60">
         {/* Track line */}
-        <div className="absolute top-1/2 left-3 right-3 h-px bg-zinc-800 -translate-y-1/2" />
+        <div className="absolute top-1/2 left-0 right-0 h-px bg-zinc-800 -translate-y-1/2" />
 
         {/* Markers */}
         {timestampedComments.map((c) => {
@@ -42,8 +42,8 @@ export default function TimelineMarkers({ comments, duration, onSeek }: Timeline
                 render={
                   <button
                     onClick={() => onSeek(c.timestamp as number)}
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-amber-400 border-2 border-amber-200/30 shadow-lg shadow-amber-500/20 hover:scale-150 transition-transform duration-200 z-10"
-                    style={{ left: `calc(${leftPercent}% * 0.94 + 3%)` }}
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-amber-400 border-2 border-amber-200/30 shadow-lg shadow-amber-500/20 hover:scale-150 transition-transform duration-200 z-10 cursor-pointer"
+                    style={{ left: `${leftPercent}%` }}
                   />
                 }
               />

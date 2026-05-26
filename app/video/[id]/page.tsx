@@ -68,7 +68,10 @@ export default function VideoReviewPage() {
     loadVideo();
   }, [videoId]);
 
-  const handleAddComment = (content: string, timestamp: number | null) => {
+  const handleAddComment = (content: string, useTimestamp: boolean) => {
+    const timestamp = useTimestamp && player.videoRef.current
+      ? player.videoRef.current.currentTime
+      : null;
     const newComment: Comment = {
       id: `c-${Date.now()}`,
       videoId,

@@ -12,7 +12,7 @@ interface CommentSidebarProps {
   comments: Comment[];
   currentTime: number;
   onSeek: (time: number) => void;
-  onAddComment: (content: string, timestamp: number | null) => void;
+  onAddComment: (content: string, useTimestamp: boolean) => void;
 }
 
 function formatTimestamp(seconds: number): string {
@@ -49,7 +49,7 @@ export default function CommentSidebar({ comments, currentTime, onSeek, onAddCom
 
   const handleSubmit = () => {
     if (!newComment.trim()) return;
-    onAddComment(newComment.trim(), attachTimestamp ? Math.floor(currentTime) : null);
+    onAddComment(newComment.trim(), attachTimestamp);
     setNewComment("");
   };
 
