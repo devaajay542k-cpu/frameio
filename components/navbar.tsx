@@ -8,24 +8,81 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CURRENT_USER } from "@/lib/mock-data";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface NavbarProps {
   onUploadClick: () => void;
   onMobileMenuClick?: () => void;
 }
 
+interface UserProfile {
+  name: string;
+  email: string;
+  avatarUrl?: string;
+}
+
 export default function Navbar({ onUploadClick, onMobileMenuClick }: NavbarProps) {
   const router = useRouter();
+  const [user, setUser] = useState<UserProfile | null>(null);
 
-  const handleSignOut = () => {
-    router.push("/login");
+  useEffect(() => {
+    async function getUser() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const metadata = session.user.user_metadata || {};
+        setUser({
+          name: metadata.full_name || metadata.name || session.user.email?.split("@")[0] || "User",
+          email: session.user.email || "",
+          avatarUrl: metadata.avatar_url || "",
+        });
+      }
+    }
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const metadata = session.user.user_metadata || {};
+        setUser({
+          name: metadata.full_name || metadata.name || session.user.email?.split("@")[0] || "User",
+          email: session.user.email || "",
+          avatarUrl: metadata.avatar_url || "",
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.push("/login");
+    } catch (err) {
+      console.error("Error signing out:", err);
+      router.push("/login");
+    }
   };
+
+  const displayName = user?.name || "User";
+  const displayEmail = user?.email || "";
+  const displayAvatar = user?.avatarUrl || "";
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "U";
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-zinc-800/80 bg-[#09090b]/80 backdrop-blur-md">
@@ -100,17 +157,19 @@ export default function Navbar({ onUploadClick, onMobileMenuClick }: NavbarProps
               }
             >
               <Avatar className="h-8.5 w-8.5">
-                <AvatarImage src={CURRENT_USER.avatarUrl} alt={CURRENT_USER.name} />
-                <AvatarFallback className="bg-indigo-900/40 text-indigo-300 text-xs">AM</AvatarFallback>
+                <AvatarImage src={displayAvatar} alt={displayName} />
+                <AvatarFallback className="bg-indigo-900/40 text-indigo-300 text-xs">{initials}</AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56 border-zinc-800 bg-[#121214] text-zinc-200" align="end">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium text-zinc-200 leading-none">{CURRENT_USER.name}</p>
-                  <p className="text-xs text-zinc-500 leading-none">{CURRENT_USER.email}</p>
-                </div>
-              </DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium text-zinc-200 leading-none">{displayName}</p>
+                    <p className="text-xs text-zinc-500 leading-none">{displayEmail}</p>
+                  </div>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
               <DropdownMenuSeparator className="bg-zinc-800/60" />
               <DropdownMenuItem className="hover:bg-zinc-800/60 cursor-pointer focus:bg-zinc-800/60 focus:text-zinc-100">
                 <UserIcon className="mr-2 h-4 w-4 text-zinc-400" />

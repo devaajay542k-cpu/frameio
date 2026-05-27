@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Film, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,26 +15,53 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
 
     setIsLoading(true);
-    // Simulate login redirect after 1.5 seconds
-    setTimeout(() => {
+    setErrorMsg(null);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setErrorMsg(error.message);
+      } else if (data.session) {
+        router.push("/");
+      }
+    } catch (err) {
+      setErrorMsg("An unexpected error occurred during sign in.");
+      console.error(err);
+    } finally {
       setIsLoading(false);
-      router.push("/");
-    }, 1200);
+    }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
-    // Simulate login redirect after 1.5 seconds
-    setTimeout(() => {
+    setErrorMsg(null);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+      if (error) {
+        setErrorMsg(error.message);
+        setIsGoogleLoading(false);
+      }
+    } catch (err) {
+      setErrorMsg("An unexpected error occurred with Google login.");
+      console.error(err);
       setIsGoogleLoading(false);
-      router.push("/");
-    }, 1200);
+    }
   };
 
   return (
@@ -70,6 +98,11 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
+            {errorMsg && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                {errorMsg}
+              </div>
+            )}
             {/* Google Sign In */}
             <Button
               variant="outline"

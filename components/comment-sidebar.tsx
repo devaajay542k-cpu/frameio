@@ -11,8 +11,11 @@ import { cn } from "@/lib/utils";
 interface CommentSidebarProps {
   comments: Comment[];
   currentTime: number;
+  currentUserId?: string;
   onSeek: (time: number) => void;
   onAddComment: (content: string, useTimestamp: boolean) => void;
+  onEditComment?: (commentId: string, newText: string) => void;
+  onDeleteComment?: (commentId: string) => void;
 }
 
 function formatTimestamp(seconds: number): string {
@@ -21,7 +24,15 @@ function formatTimestamp(seconds: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export default function CommentSidebar({ comments, currentTime, onSeek, onAddComment }: CommentSidebarProps) {
+export default function CommentSidebar({
+  comments,
+  currentTime,
+  currentUserId,
+  onSeek,
+  onAddComment,
+  onEditComment,
+  onDeleteComment,
+}: CommentSidebarProps) {
   const [newComment, setNewComment] = useState("");
   const [attachTimestamp, setAttachTimestamp] = useState(true);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
@@ -87,7 +98,10 @@ export default function CommentSidebar({ comments, currentTime, onSeek, onAddCom
                   key={c.id}
                   comment={c}
                   isActive={activeCommentId === c.id}
+                  isOwnComment={c.userId === currentUserId}
                   onClickTimestamp={onSeek}
+                  onEdit={(newText) => onEditComment?.(c.id, newText)}
+                  onDelete={() => onDeleteComment?.(c.id)}
                 />
               ))}
             </div>
@@ -105,7 +119,10 @@ export default function CommentSidebar({ comments, currentTime, onSeek, onAddCom
                   key={c.id}
                   comment={c}
                   isActive={false}
+                  isOwnComment={c.userId === currentUserId}
                   onClickTimestamp={onSeek}
+                  onEdit={(newText) => onEditComment?.(c.id, newText)}
+                  onDelete={() => onDeleteComment?.(c.id)}
                 />
               ))}
             </div>

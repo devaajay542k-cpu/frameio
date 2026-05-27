@@ -8,9 +8,25 @@ import VideoPlayer from "@/components/video-player";
 import CommentSidebar from "@/components/comment-sidebar";
 import TimelineMarkers from "@/components/timeline-markers";
 import { useVideoPlayer } from "@/hooks/use-video-player";
-import { MOCK_VIDEOS, MOCK_COMMENTS, CURRENT_USER } from "@/lib/mock-data";
+import { MOCK_VIDEOS, MOCK_COMMENTS } from "@/lib/mock-data";
 import { Comment, Video } from "@/types";
 import { supabase } from "@/lib/supabase";
+
+interface CurrentUser {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+}
+
+interface DatabaseComment {
+  id: string;
+  video_id: string;
+  user_id: string;
+  text: string;
+  timestamp_seconds: number | null;
+  created_at: string;
+}
 
 export default function VideoReviewPage() {
   const params = useParams();
@@ -19,14 +35,32 @@ export default function VideoReviewPage() {
 
   const [video, setVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
   const [comments, setComments] = useState<Comment[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   const player = useVideoPlayer();
 
   useEffect(() => {
     async function loadVideo() {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          router.push("/login");
+          return;
+        }
+
+        const metadata = session.user.user_metadata || {};
+        setCurrentUser({
+          id: session.user.id,
+          name: metadata.full_name || metadata.name || session.user.email?.split("@")[0] || "User",
+          email: session.user.email || "",
+          avatarUrl: metadata.avatar_url || "",
+        });
+
+        setAuthLoading(false);
+
         // Try searching in MOCK_VIDEOS first
         const mockVideo = MOCK_VIDEOS.find((v) => v.id === videoId);
         if (mockVideo) {
@@ -57,33 +91,143 @@ export default function VideoReviewPage() {
             createdAt: data.created_at || data.createdAt || new Date().toISOString(),
             commentsCount: data.comments_count || data.commentsCount || 0,
           });
+
+          // Fetch comments for this video from Supabase
+          const { data: commentsData, error: commentsError } = await supabase
+            .from("comments")
+            .select("*")
+            .eq("video_id", videoId);
+
+          if (commentsError) {
+            console.warn("Could not fetch comments from Supabase:", commentsError.message);
+          } else if (commentsData) {
+            const mappedComments: Comment[] = (commentsData as unknown as DatabaseComment[]).map((item) => {
+              const isMe = item.user_id === session.user.id;
+              const userName = isMe
+                ? `${metadata.full_name || metadata.name || session.user.email?.split("@")[0] || "User"} (You)`
+                : `User (${item.user_id.slice(0, 5)})`;
+              const userAvatar = isMe ? (metadata.avatar_url || "") : "";
+              return {
+                id: item.id,
+                videoId: item.video_id,
+                userId: item.user_id,
+                userName,
+                userAvatar,
+                timestamp: item.timestamp_seconds,
+                content: item.text,
+                createdAt: item.created_at,
+              };
+            });
+            setComments(mappedComments);
+          }
         }
       } catch (err) {
         console.error("Failed to load video:", err);
+        router.push("/login");
       } finally {
         setLoading(false);
       }
     }
 
     loadVideo();
-  }, [videoId]);
+  }, [videoId, router]);
 
-  const handleAddComment = (content: string, useTimestamp: boolean) => {
+  const handleAddComment = async (content: string, useTimestamp: boolean) => {
+    if (!currentUser) return;
     const timestamp = useTimestamp && player.videoRef.current
       ? player.videoRef.current.currentTime
       : null;
-    const newComment: Comment = {
-      id: `c-${Date.now()}`,
-      videoId,
-      userId: CURRENT_USER.id,
-      userName: `${CURRENT_USER.name} (You)`,
-      userAvatar: CURRENT_USER.avatarUrl,
-      timestamp,
-      content,
-      createdAt: new Date().toISOString(),
-    };
-    setComments((prev) => [...prev, newComment]);
+
+    console.log("INSERTING COMMENT", {
+      video_id: videoId,
+      user_id: currentUser.id,
+      text: content,
+      timestamp_seconds: timestamp,
+    });
+
+    try {
+      const { data, error } = await supabase
+        .from("comments")
+        .insert({
+          video_id: videoId,
+          user_id: currentUser.id,
+          text: content,
+          timestamp_seconds: timestamp,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error inserting comment:", error.message);
+        return;
+      }
+
+      if (data) {
+        const newComment: Comment = {
+          id: data.id,
+          videoId: data.video_id,
+          userId: currentUser.id,
+          userName: `${currentUser.name} (You)`,
+          userAvatar: currentUser.avatarUrl,
+          timestamp: data.timestamp_seconds,
+          content: data.text,
+          createdAt: data.created_at,
+        };
+        setComments((prev) => [...prev, newComment]);
+      }
+    } catch (err) {
+      console.error("Failed to add comment:", err);
+    }
   };
+
+  const handleEditComment = async (commentId: string, newText: string) => {
+    try {
+      const { error } = await supabase
+        .from("comments")
+        .update({ text: newText })
+        .eq("id", commentId);
+
+      if (error) {
+        console.error("Error editing comment:", error.message);
+        return;
+      }
+
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, content: newText } : c))
+      );
+    } catch (err) {
+      console.error("Failed to edit comment:", err);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      const { error } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", commentId);
+
+      if (error) {
+        console.error("Error deleting comment:", error.message);
+        return;
+      }
+
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (err) {
+      console.error("Failed to delete comment:", err);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent mx-auto mb-4" />
+          <p className="text-sm text-zinc-400">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -216,8 +360,11 @@ export default function VideoReviewPage() {
             <CommentSidebar
               comments={comments}
               currentTime={player.currentTime}
+              currentUserId={currentUser?.id}
               onSeek={player.seek}
               onAddComment={handleAddComment}
+              onEditComment={handleEditComment}
+              onDeleteComment={handleDeleteComment}
             />
           </div>
         )}
@@ -234,8 +381,11 @@ export default function VideoReviewPage() {
             <CommentSidebar
               comments={comments}
               currentTime={player.currentTime}
+              currentUserId={currentUser?.id}
               onSeek={player.seek}
               onAddComment={handleAddComment}
+              onEditComment={handleEditComment}
+              onDeleteComment={handleDeleteComment}
             />
           </div>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/navbar";
 import Sidebar from "@/components/sidebar";
 import VideoCard from "@/components/video-card";
@@ -25,13 +26,24 @@ interface DatabaseVideo {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
-    async function fetchVideos() {
+    async function checkAuthAndFetch() {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          router.push("/login");
+          return;
+        }
+
+        setAuthLoading(false);
+
         const { data, error } = await supabase
           .from("videos")
           .select("*");
@@ -56,12 +68,24 @@ export default function DashboardPage() {
           setVideos(mappedVideos);
         }
       } catch (err) {
-        console.error("Error fetching videos from Supabase:", err);
+        console.error("Error during auth check / fetch:", err);
+        router.push("/login");
       }
     }
 
-    fetchVideos();
-  }, []);
+    checkAuthAndFetch();
+  }, [router, refreshTrigger]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent mx-auto mb-4" />
+          <p className="text-sm text-zinc-400">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#09090b]">
@@ -139,7 +163,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Upload Modal */}
-      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
+      <UploadModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onSuccess={() => setRefreshTrigger((prev) => prev + 1)}
+      />
     </div>
   );
 }

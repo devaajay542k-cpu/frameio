@@ -6,55 +6,126 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 interface UploadModalProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 type UploadStatus = "idle" | "dragging" | "uploading" | "processing" | "done" | "error";
 
-export default function UploadModal({ open, onClose }: UploadModalProps) {
+export default function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const simulateUpload = useCallback((name: string) => {
-    setFileName(name);
+  const handleUpload = useCallback(async (file: File) => {
+    setFileName(file.name);
     setStatus("uploading");
     setProgress(0);
 
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        const next = prev + Math.random() * 12;
-        if (next >= 100) {
-          clearInterval(interval);
-          setStatus("processing");
-          setTimeout(() => setStatus("done"), 1200);
-          return 100;
-        }
-        return next;
+    try {
+      // 1. Request presigned URL from API route
+      const presignResponse = await fetch("/api/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || "video/mp4",
+        }),
       });
-    }, 180);
-  }, []);
+
+      if (!presignResponse.ok) {
+        throw new Error("Failed to get presigned upload URL");
+      }
+
+      const { presignedUrl, key } = await presignResponse.json();
+      console.log("1", presignedUrl, key);
+
+      // 2. Upload file directly to R2 using XMLHttpRequest to track progress
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", presignedUrl, true);
+        xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = (event.loaded / event.total) * 100;
+            setProgress(Math.round(percentComplete));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status: ${xhr.status}`));
+          }
+        };
+
+        xhr.onerror = () => {
+          reject(new Error("Network error during upload"));
+        };
+
+        xhr.send(file);
+      });
+
+      setStatus("processing");
+
+      // 3. Save video record in Supabase
+      const videoUrl = `/api/video-file?key=${encodeURIComponent(key)}`;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error("No active user session found. Please log in.");
+      }
+
+      const { error: dbError } = await supabase
+        .from("videos")
+        .insert({
+          title: file.name.replace(/\.[^/.]+$/, ""), // remove extension for clean title
+          video_url: videoUrl,
+          created_at: new Date().toISOString(),
+          user_id: userId
+        });
+
+      if (dbError) {
+        console.error("Database insert error:", dbError);
+        throw dbError;
+      }
+
+      setStatus("done");
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (err) {
+      console.error("R2 Upload failed:", err);
+      setStatus("error");
+    }
+  }, [onSuccess]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       setStatus("idle");
       const file = e.dataTransfer.files?.[0];
-      if (file) simulateUpload(file.name);
+      if (file) handleUpload(file);
     },
-    [simulateUpload]
+    [handleUpload]
   );
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file) simulateUpload(file.name);
+      if (file) handleUpload(file);
     },
-    [simulateUpload]
+    [handleUpload]
   );
 
   const handleClose = () => {
