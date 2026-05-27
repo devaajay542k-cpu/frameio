@@ -9,6 +9,9 @@ import UploadModal from "@/components/upload-modal";
 import { Film, LayoutGrid, List } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Video } from "@/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 interface DatabaseVideo {
   id: string;
@@ -33,6 +36,13 @@ export default function DashboardPage() {
   const [authLoading, setAuthLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // Edit/Delete state
+  const [editingVideo, setEditingVideo] = useState<Video | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+  const [deletingVideo, setDeletingVideo] = useState<Video | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   useEffect(() => {
     async function checkAuthAndFetch() {
       try {
@@ -47,8 +57,7 @@ export default function DashboardPage() {
         const { data, error } = await supabase
           .from("videos")
           .select("*");
-        console.log(data);
-        console.log(error);
+
         if (error) {
           console.warn("Could not fetch videos from Supabase:", error.message);
           return;
@@ -75,6 +84,88 @@ export default function DashboardPage() {
 
     checkAuthAndFetch();
   }, [router, refreshTrigger]);
+
+  const startEditTitle = (video: Video) => {
+    setEditingVideo(video);
+    setNewTitle(video.title);
+  };
+
+  const handleSaveTitle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVideo || !newTitle.trim()) return;
+
+    setIsSaving(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("User not authenticated");
+        return;
+      }
+      console.log(editingVideo.id);
+      console.log(user.id);
+      const { data, error } = await supabase
+        .from("videos")
+        .update({
+          title: newTitle.trim(),
+        })
+        .eq("id", editingVideo.id)
+        .eq("user_id", user.id)
+        .select();
+
+      console.log(data, error);
+
+      if (error) {
+        throw error;
+      }
+
+      setRefreshTrigger((prev) => prev + 1);
+      setEditingVideo(null);
+    } catch (err) {
+      console.error("Failed to update video title:", err);
+      alert("Failed to update video title. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteVideo = async () => {
+    if (!deletingVideo) return;
+
+    setIsDeleting(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("User not authenticated");
+        return;
+      }
+
+      const res = await fetch(`/api/videos/${deletingVideo.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to delete video");
+      }
+
+      setRefreshTrigger((prev) => prev + 1);
+      setDeletingVideo(null);
+    } catch (err) {
+      console.error("Failed to delete video:", err);
+      const errorMsg = err instanceof Error ? err.message : "Failed to delete video. Please try again.";
+      alert(errorMsg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (authLoading) {
     return (
@@ -137,7 +228,12 @@ export default function DashboardPage() {
             {videos.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5">
                 {videos.map((video) => (
-                  <VideoCard key={video.id} video={video} />
+                  <VideoCard
+                    key={video.id}
+                    video={video}
+                    onEditTitle={startEditTitle}
+                    onDeleteVideo={setDeletingVideo}
+                  />
                 ))}
               </div>
             ) : (
@@ -168,6 +264,105 @@ export default function DashboardPage() {
         onClose={() => setUploadOpen(false)}
         onSuccess={() => setRefreshTrigger((prev) => prev + 1)}
       />
+
+      {/* Edit Title Dialog */}
+      <Dialog open={!!editingVideo} onOpenChange={(open) => !open && setEditingVideo(null)}>
+        <DialogContent className="sm:max-w-md border-zinc-800 bg-[#121214] text-zinc-100 shadow-2xl rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-zinc-100">
+              Rename Video
+            </DialogTitle>
+            <p className="text-xs text-zinc-500 mt-1">
+              Give your video project a new, descriptive name.
+            </p>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveTitle} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="video-title-input" className="text-xs font-semibold text-zinc-400">
+                Title
+              </label>
+              <Input
+                id="video-title-input"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Enter video title"
+                className="w-full bg-zinc-900 border-zinc-800 text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:ring-indigo-500/20"
+                required
+                disabled={isSaving}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setEditingVideo(null)}
+                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 h-9 rounded-lg px-4 cursor-pointer"
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-indigo-600 hover:bg-indigo-500 text-zinc-50 font-medium h-9 px-4 rounded-lg shadow-md shadow-indigo-600/10 hover:shadow-indigo-500/20 transition-all duration-200 cursor-pointer"
+                disabled={isSaving || !newTitle.trim()}
+              >
+                {isSaving ? (
+                  <div className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-200 border-t-transparent" />
+                    <span>Saving...</span>
+                  </div>
+                ) : (
+                  "Save changes"
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deletingVideo} onOpenChange={(open) => !open && setDeletingVideo(null)}>
+        <DialogContent className="sm:max-w-md border-zinc-800 bg-[#121214] text-zinc-100 shadow-2xl rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-red-400">
+              Delete Video
+            </DialogTitle>
+            <div className="text-xs text-zinc-500 mt-1 leading-relaxed">
+              Are you sure you want to delete <span className="text-zinc-300 font-semibold">&ldquo;{deletingVideo?.title}&rdquo;</span>? This will permanently delete the video file from the Cloudflare R2 bucket and erase all associated comments. This action cannot be undone.
+            </div>
+          </DialogHeader>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeletingVideo(null)}
+              className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 h-9 rounded-lg px-4 cursor-pointer"
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDeleteVideo}
+              className="bg-red-600 hover:bg-red-500 text-zinc-50 font-medium h-9 px-4 rounded-lg shadow-md shadow-red-600/10 hover:shadow-red-500/20 transition-all duration-200 cursor-pointer"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <div className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-200 border-t-transparent" />
+                  <span>Deleting...</span>
+                </div>
+              ) : (
+                "Delete Video"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

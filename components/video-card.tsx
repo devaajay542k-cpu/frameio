@@ -1,11 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { MessageSquare, Clock, Play } from "lucide-react";
+import { useRef, useEffect } from "react";
+import { MessageSquare, Clock, Play, MoreVertical, Trash2 } from "lucide-react";
 import { Video } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface VideoCardProps {
   video: Video;
+  onEditTitle?: (video: Video) => void;
+  onDeleteVideo?: (video: Video) => void;
 }
 
 function formatDuration(seconds: number): string {
@@ -20,8 +29,37 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export default function VideoCard({ video }: VideoCardProps) {
+export default function VideoCard({ video, onEditTitle, onDeleteVideo }: VideoCardProps) {
   const router = useRouter();
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear timeout on unmount to prevent leaks
+  useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleTitleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (clickTimeoutRef.current) {
+      // This is a double click!
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+      if (onEditTitle) {
+        onEditTitle(video);
+      }
+    } else {
+      // This is a single click! Delay the navigation to determine if it is a double click
+      clickTimeoutRef.current = setTimeout(() => {
+        clickTimeoutRef.current = null;
+        router.push(`/video/${video.id}`);
+      }, 250);
+    }
+  };
 
   return (
     <div
@@ -54,9 +92,40 @@ export default function VideoCard({ video }: VideoCardProps) {
 
       {/* Card Body */}
       <div className="flex flex-col gap-2 p-4">
-        <h3 className="text-sm font-semibold text-zinc-100 line-clamp-2 leading-snug group-hover:text-white transition-colors">
-          {video.title}
-        </h3>
+        <div className="flex items-start justify-between gap-2">
+          <h3
+            onClick={handleTitleClick}
+            className="text-sm font-semibold text-zinc-100 line-clamp-2 leading-snug group-hover:text-white transition-colors cursor-pointer select-none flex-1"
+            title="Double click to edit title"
+          >
+            {video.title}
+          </h3>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              onClick={(e) => e.stopPropagation()}
+              className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60 active:bg-zinc-800 transition-colors outline-hidden focus:bg-zinc-800/60 focus:text-zinc-300 cursor-pointer"
+              aria-label="Video options"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 border-zinc-800 bg-[#121214] text-zinc-100 p-1 shadow-lg">
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onDeleteVideo) {
+                    onDeleteVideo(video);
+                  }
+                }}
+                className="cursor-pointer gap-2 flex items-center text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md px-2 py-1.5 text-sm"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete Video</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         <div className="flex items-center justify-between mt-1">
           <div className="flex items-center gap-1.5 text-zinc-500 text-xs">
