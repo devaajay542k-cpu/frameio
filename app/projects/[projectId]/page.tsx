@@ -105,29 +105,37 @@ export default function ProjectPage() {
         // 4. Fetch Videos in project
         const { data: vids } = await supabase
           .from("videos")
-          .select("*")
+          .select("*, current_version:video_versions!current_version_id(*)")
           .eq("project_id", projectId)
           .order("created_at", { ascending: false });
 
         if (vids) {
-          const mappedVideos: Video[] = vids.map((item: any) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description || "",
-            thumbnailUrl: item.thumbnail_url || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=640",
-            videoUrl: item.video_url || "",
-            duration: item.duration_seconds || 0,
-            createdAt: item.created_at || new Date().toISOString(),
-            commentsCount: 0, // In dynamic mode, comments count is resolved by joining or separate query
-          }));
+          const mappedVideos: Video[] = vids.map((item: any) => {
+            const currentVersion = item.current_version;
+            return {
+              id: item.id,
+              title: item.title,
+              description: item.description || "",
+              thumbnailUrl: currentVersion?.thumbnail_url || "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=640",
+              videoUrl: currentVersion ? `/api/video-file?key=${encodeURIComponent(currentVersion.storage_path)}` : "",
+              duration: currentVersion?.duration || 0,
+              createdAt: item.created_at || new Date().toISOString(),
+              commentsCount: 0,
+              current_version_id: item.current_version_id,
+            };
+          });
 
-          // Fetch comments counts for each video
+          // Fetch comments counts for the current version of each video
           for (const video of mappedVideos) {
-            const { count } = await supabase
-              .from("comments")
-              .select("*", { count: "exact", head: true })
-              .eq("video_id", video.id);
-            video.commentsCount = count || 0;
+            if (video.current_version_id) {
+              const { count } = await supabase
+                .from("comments")
+                .select("*", { count: "exact", head: true })
+                .eq("video_version_id", video.current_version_id);
+              video.commentsCount = count || 0;
+            } else {
+              video.commentsCount = 0;
+            }
           }
 
           setVideos(mappedVideos);
