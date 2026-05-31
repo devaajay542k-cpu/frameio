@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { Mail, Check, AlertCircle, Building2, Shield, ArrowRight, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 function AcceptInvitePageContent() {
   const router = useRouter();
@@ -100,7 +101,7 @@ function AcceptInvitePageContent() {
       router.push(`/organizations/${invite.organization_id}`);
     } catch (err) {
       console.error("Failed to accept invite:", err);
-      alert("Failed to accept invitation. Please try again.");
+      toast.error("Failed to accept invitation. Please try again.");
       setAccepting(false);
     }
   };

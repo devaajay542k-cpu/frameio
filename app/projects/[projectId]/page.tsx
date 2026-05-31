@@ -12,6 +12,7 @@ import { Film, UserPlus, Users, Plus, Shield, ArrowLeft, Loader2, Edit3, Trash2 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import { Video } from "@/types";
 
 export default function ProjectPage() {
@@ -46,6 +47,10 @@ export default function ProjectPage() {
   // Delete Video Dialog
   const [deletingVideo, setDeletingVideo] = useState<Video | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Confirm states for removing member / deleting project
+  const [removingMember, setRemovingMember] = useState<any>(null);
+  const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
 
   // Add Member inputs
   const [memberEmail, setMemberEmail] = useState("");
@@ -189,21 +194,16 @@ export default function ProjectPage() {
       setRefreshTrigger(prev => prev + 1);
       setMemberEmail("");
       setAddMemberOpen(false);
-      alert("Member added successfully!");
+      toast.success("Member added successfully!");
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to add project member");
+      toast.error(err instanceof Error ? err.message : "Failed to add project member");
     } finally {
       setAddingMember(false);
     }
   };
 
   const handleRemoveMember = async (targetUserId: string, isOrgLevel?: boolean) => {
-    const confirmMsg = isOrgLevel
-      ? "This will remove this user from the entire organization (and all projects). Are you sure?"
-      : "Are you sure you want to remove this member from the project?";
-    if (!confirm(confirmMsg)) return;
-
     try {
       if (isOrgLevel) {
         // Remove from organization_members (org-level admin removal)
@@ -228,15 +228,14 @@ export default function ProjectPage() {
         }
         setProjectMembers(prev => prev.filter(m => m.user_id !== targetUserId));
       }
+      toast.success("Member removed successfully");
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to remove member");
+      toast.error(err instanceof Error ? err.message : "Failed to remove member");
     }
   };
 
   const handleDeleteProject = async () => {
-    if (!confirm("Are you sure you want to delete this project? This will delete all videos inside. This action cannot be undone.")) return;
-
     try {
       const response = await fetch(`/api/projects?projectId=${projectId}&userId=${currentUser.id}`, {
         method: "DELETE",
@@ -246,11 +245,11 @@ export default function ProjectPage() {
         throw new Error("Failed to delete project");
       }
 
-      alert("Project deleted successfully");
+      toast.success("Project deleted successfully");
       router.push(`/organizations/${project.organization_id}`);
     } catch (err) {
       console.error(err);
-      alert("Failed to delete project");
+      toast.error("Failed to delete project");
     }
   };
 
@@ -277,7 +276,7 @@ export default function ProjectPage() {
       setEditingVideo(null);
     } catch (err) {
       console.error(err);
-      alert("Failed to update video title");
+      toast.error("Failed to update video title");
     } finally {
       setSavingTitle(false);
     }
@@ -304,7 +303,7 @@ export default function ProjectPage() {
       setDeletingVideo(null);
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to delete video");
+      toast.error(err instanceof Error ? err.message : "Failed to delete video");
     } finally {
       setDeleting(false);
     }
@@ -420,7 +419,7 @@ export default function ProjectPage() {
               <div className="flex flex-wrap gap-3">
                 {canDeleteProj && (
                   <Button
-                    onClick={handleDeleteProject}
+                    onClick={() => setDeleteProjectOpen(true)}
                     variant="ghost"
                     className="border border-red-500/20 text-red-400 hover:bg-red-500/15 text-xs h-10 px-4 rounded-lg flex items-center gap-1.5"
                   >
@@ -514,7 +513,7 @@ export default function ProjectPage() {
                       
                       {canRemoveMember(m) && (
                         <button
-                          onClick={() => handleRemoveMember(m.user_id, m._isOrgLevel)}
+                          onClick={() => setRemovingMember(m)}
                           className="text-[10px] text-zinc-600 hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded transition-all cursor-pointer"
                         >
                           Remove
@@ -700,6 +699,83 @@ export default function ProjectPage() {
               disabled={deleting}
             >
               {deleting ? "Deleting..." : "Delete Video"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Member Confirmation Dialog */}
+      <Dialog open={!!removingMember} onOpenChange={(open) => !open && setRemovingMember(null)}>
+        <DialogContent className="sm:max-w-md border-zinc-800 bg-[#121214] text-zinc-100 shadow-2xl rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-red-400">
+              Remove Member
+            </DialogTitle>
+            <div className="text-xs text-zinc-500 mt-2 leading-relaxed">
+              {removingMember?._isOrgLevel ? (
+                <span>
+                  Are you sure you want to remove <span className="text-zinc-300 font-semibold">{removingMember?.name}</span> from the entire organization? This will also remove them from all projects.
+                </span>
+              ) : (
+                <span>
+                  Are you sure you want to remove <span className="text-zinc-300 font-semibold">{removingMember?.name}</span> from this project?
+                </span>
+              )}
+            </div>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setRemovingMember(null)}
+              className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 h-9 px-4 rounded-lg cursor-pointer text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!removingMember) return;
+                await handleRemoveMember(removingMember.user_id, removingMember._isOrgLevel);
+                setRemovingMember(null);
+              }}
+              className="bg-red-600 hover:bg-red-500 text-zinc-50 font-medium h-9 px-4 rounded-lg shadow-md transition-all duration-200 cursor-pointer text-xs"
+            >
+              Remove Member
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Project Confirmation Dialog */}
+      <Dialog open={deleteProjectOpen} onOpenChange={(open) => !open && setDeleteProjectOpen(false)}>
+        <DialogContent className="sm:max-w-md border-zinc-800 bg-[#121214] text-zinc-100 shadow-2xl rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-red-400">
+              Delete Project
+            </DialogTitle>
+            <div className="text-xs text-zinc-500 mt-2 leading-relaxed font-normal">
+              Are you sure you want to delete <span className="text-zinc-300 font-semibold">&ldquo;{project?.name}&rdquo;</span>? This will permanently delete the project and all video assets inside. This action cannot be undone.
+            </div>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleteProjectOpen(false)}
+              className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 h-9 px-4 rounded-lg cursor-pointer text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                await handleDeleteProject();
+                setDeleteProjectOpen(false);
+              }}
+              className="bg-red-600 hover:bg-red-500 text-zinc-50 font-medium h-9 px-4 rounded-lg shadow-md transition-all duration-200 cursor-pointer text-xs"
+            >
+              Delete Project
             </Button>
           </div>
         </DialogContent>

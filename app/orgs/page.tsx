@@ -9,6 +9,7 @@ import { Building2, Plus, Users, Calendar, Mail, Check, X, Loader2, ChevronRight
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function OrgsDashboard() {
   const router = useRouter();
@@ -70,7 +71,7 @@ export default function OrgsDashboard() {
       router.push(`/organizations/${org.id}`);
     } catch (err) {
       console.error(err);
-      alert("Failed to create organization.");
+      toast.error("Failed to create organization.");
     } finally {
       setCreating(false);
     }
@@ -87,7 +88,7 @@ export default function OrgsDashboard() {
       if (orgDetails) setOrganizations((prev) => [...prev, { ...orgDetails, memberRole: invite.role, joinedAt: new Date().toISOString() }]);
     } catch (err) {
       console.error(err);
-      alert("Failed to accept invite.");
+      toast.error("Failed to accept invite.");
     } finally {
       setProcessingInviteId(null);
     }

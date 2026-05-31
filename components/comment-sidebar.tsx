@@ -65,7 +65,7 @@ export default function CommentSidebar({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
@@ -174,7 +174,7 @@ export default function CommentSidebar({
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-[10px] text-zinc-600">⌘ + Enter to send</p>
+        <p className="text-[10px] text-zinc-600">Enter to send, Shift + Enter for new line</p>
       </div>
     </div>
   );

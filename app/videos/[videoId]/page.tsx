@@ -11,6 +11,7 @@ import { useVideoPlayer } from "@/hooks/use-video-player";
 import { Comment, Video } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { getEffectiveRole, hasPermission, Role } from "@/lib/auth-utils";
+import { toast } from "sonner";
 
 interface CurrentUser {
   id: string;
@@ -210,7 +211,7 @@ export default function VideoReviewPage() {
       }
     } catch (err) {
       console.error("Failed to add comment:", err);
-      alert(err instanceof Error ? err.message : "Failed to add comment");
+      toast.error(err instanceof Error ? err.message : "Failed to add comment");
     }
   };
 
@@ -252,7 +253,7 @@ export default function VideoReviewPage() {
       setComments((prev) => prev.filter((c) => c.id !== commentId));
     } catch (err) {
       console.error("Failed to delete comment:", err);
-      alert(err instanceof Error ? err.message : "Failed to delete comment");
+      toast.error(err instanceof Error ? err.message : "Failed to delete comment");
     }
   };
 

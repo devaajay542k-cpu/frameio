@@ -9,6 +9,7 @@ import { Folder, Users, Mail, Plus, ExternalLink, Shield, Trash2, ShieldCheck, U
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function OrganizationPage() {
   const params = useParams();
@@ -39,6 +40,7 @@ export default function OrganizationPage() {
   const [inviteRole, setInviteRole] = useState("member");
   const [inviting, setInviting] = useState(false);
   const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
+  const [cancelingInvite, setCancelingInvite] = useState<any>(null);
 
   useEffect(() => {
     async function loadOrgData() {
@@ -176,7 +178,7 @@ export default function OrganizationPage() {
       setProjectOpen(false);
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to create project");
+      toast.error(err instanceof Error ? err.message : "Failed to create project");
     } finally {
       setCreatingProject(false);
     }
@@ -209,17 +211,16 @@ export default function OrganizationPage() {
       setInvites((prev) => [newInvite, ...prev]);
       setInviteEmail("");
       setInviteOpen(false);
-      alert(`Invite generated successfully! You can copy the token from the Invites tab.`);
+      toast.success(`Invite generated successfully! You can copy the token from the Invites tab.`);
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to generate invite");
+      toast.error(err instanceof Error ? err.message : "Failed to generate invite");
     } finally {
       setInviting(false);
     }
   };
 
   const handleCancelInvite = async (inviteId: string) => {
-    if (!confirm("Are you sure you want to cancel this invite?")) return;
     try {
       const response = await fetch(`/api/invites?inviteId=${inviteId}&userId=${currentUser.id}`, {
         method: "DELETE",
@@ -230,9 +231,10 @@ export default function OrganizationPage() {
       }
 
       setInvites((prev) => prev.filter((i) => i.id !== inviteId));
+      toast.success("Invitation cancelled successfully");
     } catch (err) {
       console.error(err);
-      alert("Failed to cancel invite");
+      toast.error("Failed to cancel invite");
     }
   };
 
@@ -502,7 +504,7 @@ export default function OrganizationPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleCancelInvite(invite.id)}
+                                onClick={() => setCancelingInvite(invite)}
                                 className="h-8 hover:bg-red-500/10 hover:text-red-400 text-zinc-500 rounded-lg"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -670,6 +672,41 @@ export default function OrganizationPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Invite Confirmation Dialog */}
+      <Dialog open={!!cancelingInvite} onOpenChange={(open) => !open && setCancelingInvite(null)}>
+        <DialogContent className="sm:max-w-md border-zinc-800 bg-[#121214] text-zinc-100 shadow-2xl rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-red-400">
+              Cancel Invitation
+            </DialogTitle>
+            <div className="text-xs text-zinc-500 mt-2 leading-relaxed">
+              Are you sure you want to cancel the invitation for <span className="text-zinc-300 font-semibold">{cancelingInvite?.email}</span>? They will no longer be able to join the organization using this link.
+            </div>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setCancelingInvite(null)}
+              className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 h-9 px-4 rounded-lg cursor-pointer text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                if (!cancelingInvite) return;
+                await handleCancelInvite(cancelingInvite.id);
+                setCancelingInvite(null);
+              }}
+              className="bg-red-600 hover:bg-red-500 text-zinc-50 font-medium h-9 px-4 rounded-lg shadow-md transition-all duration-200 cursor-pointer text-xs"
+            >
+              Cancel Invite
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
