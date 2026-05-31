@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aether | Frame.io Inspired Video Review & Collaboration",
+  title: "ShotFlow | Frame.io Inspired Video Review & Collaboration",
   description: "A premium, minimalist video review platform for production teams. Review frame-by-frame and leave timestamped feedback.",
 };
 

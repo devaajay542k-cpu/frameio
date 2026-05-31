@@ -36,7 +36,7 @@ const SAMSUNG_PROJECT = "d2222222-2222-2222-2222-222222222222";
 
 async function main() {
   console.log("═══════════════════════════════════════════");
-  console.log("  AETHER — Test User Seed Script");
+  console.log("  SHOTFLOW — Test User Seed Script");
   console.log("═══════════════════════════════════════════\n");
 
   // ────────────────────────────────────────────────────

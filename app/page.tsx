@@ -31,7 +31,7 @@ export default function HomePage() {
 
         if (memberships && memberships.length > 0) {
           // If we have a stored organization preference, try to use it
-          const storedOrg = localStorage.getItem("aether_active_org");
+          const storedOrg = localStorage.getItem("shotflow_active_org");
           const matched = memberships.find(m => m.organization_id === storedOrg);
           if (matched) {
             router.push(`/organizations/${matched.organization_id}`);

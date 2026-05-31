@@ -141,10 +141,10 @@ export default function OrgsDashboard() {
 
             {/* Pending invites */}
             {pendingInvites.length > 0 && (
-              <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 overflow-hidden">
-                <div className="px-4 py-3 border-b border-indigo-500/15 flex items-center gap-2">
+              <div className="rounded-lg border border-zinc-800 border-l-2 border-l-indigo-500 bg-zinc-950/40 overflow-hidden">
+                <div className="px-4 py-3 border-b border-zinc-850 flex items-center gap-2">
                   <Mail className="h-3.5 w-3.5 text-indigo-400" />
-                  <span className="text-xs font-medium text-indigo-300">
+                  <span className="text-xs font-medium text-[#ededed]">
                     {pendingInvites.length} pending invite{pendingInvites.length > 1 ? "s" : ""}
                   </span>
                 </div>

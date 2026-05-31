@@ -164,7 +164,7 @@ export default function LoginPage() {
             </div>
           </div>
           <h1 className="mt-4 text-2xl font-bold tracking-tight bg-gradient-to-r from-zinc-50 via-zinc-100 to-zinc-400 bg-clip-text text-transparent font-sans">
-            AETHER
+            ShotFlow
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
             Frame-accurate video review and collaboration
@@ -185,8 +185,8 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent className="grid gap-4">
             {errorMsg && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400 space-y-2">
-                <p>{errorMsg}</p>
+              <div className="p-3 rounded-lg bg-zinc-950/60 border border-zinc-800 border-l-2 border-l-red-500 text-xs text-zinc-300 space-y-2">
+                <p className="text-red-400/90 font-medium">{errorMsg}</p>
                 {showResend && (
                   <button
                     type="button"
@@ -200,8 +200,8 @@ export default function LoginPage() {
               </div>
             )}
             {successMsg && (
-              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
-                {successMsg}
+              <div className="p-3 rounded-lg bg-zinc-950/60 border border-zinc-800 border-l-2 border-l-emerald-500 text-xs text-zinc-300">
+                <p className="text-emerald-400/90 font-medium">{successMsg}</p>
               </div>
             )}
             

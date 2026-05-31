@@ -96,7 +96,7 @@ export default function Navbar({ onUploadClick, onMobileMenuClick }: NavbarProps
               <Film className="h-3.5 w-3.5 text-white" />
             </div>
             <span className="text-sm font-semibold text-[#ededed] tracking-tight">
-              Aether
+              ShotFlow
             </span>
           </button>
 
@@ -137,7 +137,7 @@ export default function Navbar({ onUploadClick, onMobileMenuClick }: NavbarProps
               <ChevronDown className="h-3 w-3 text-[#6b6b6b] group-hover:text-[#a1a1a1] transition-colors" />
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-56 border-[rgba(255,255,255,0.08)] bg-[#141414] text-[#ededed] shadow-xl rounded-lg p-1"
+              className="w-56 border-[rgba(255,255,255,0.08)] bg-[#141414]/95 backdrop-blur-md text-[#ededed] shadow-2xl rounded-lg p-1"
               align="end"
             >
               <div className="px-2 py-1.5 mb-1">

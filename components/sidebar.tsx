@@ -6,6 +6,12 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SidebarProps {
   className?: string;
@@ -66,11 +72,11 @@ export default function Sidebar({ className }: SidebarProps) {
                 if (proj) { const m = orgList.find((o: any) => o.id === proj.organization_id); if (m) active = m; }
               }
             } else {
-              const stored = localStorage.getItem("aether_active_org");
+              const stored = localStorage.getItem("shotflow_active_org");
               if (stored) { const m = orgList.find((o: any) => o.id === stored); if (m) active = m; }
             }
             setActiveOrg(active);
-            localStorage.setItem("aether_active_org", active.id);
+            localStorage.setItem("shotflow_active_org", active.id);
           }
         }
       } catch (err) {
@@ -103,7 +109,7 @@ export default function Sidebar({ className }: SidebarProps) {
     const selected = organizations.find((o) => o.id === orgId);
     if (selected) {
       setActiveOrg(selected);
-      localStorage.setItem("aether_active_org", selected.id);
+      localStorage.setItem("shotflow_active_org", selected.id);
       router.push(`/organizations/${selected.id}`);
     }
   };
@@ -121,19 +127,12 @@ export default function Sidebar({ className }: SidebarProps) {
         {loadingOrgs ? (
           <div className="h-7 rounded bg-[#1a1a1a] animate-pulse w-full" />
         ) : activeOrg ? (
-          <div className="relative group">
-            <select
-              value={activeOrg.id}
-              onChange={(e) => handleOrgChange(e.target.value)}
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button className="flex w-full items-center justify-between px-2 py-1.5 rounded-md hover:bg-[#1a1a1a] transition-colors cursor-pointer group text-left border-0 outline-none" />
+              }
             >
-              {organizations.map((org) => (
-                <option key={org.id} value={org.id} className="bg-[#141414] text-[#ededed]">
-                  {org.name}
-                </option>
-              ))}
-            </select>
-            <div className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-[#1a1a1a] transition-colors cursor-pointer">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-indigo-600/20 border border-indigo-500/20 text-indigo-400 font-bold text-[9px] uppercase">
                   {activeOrg.name.slice(0, 2)}
@@ -142,9 +141,28 @@ export default function Sidebar({ className }: SidebarProps) {
                   <p className="text-xs font-medium text-[#ededed] truncate leading-none">{activeOrg.name}</p>
                 </div>
               </div>
-              <ChevronDown className="h-3.5 w-3.5 text-[#6b6b6b] shrink-0" />
-            </div>
-          </div>
+              <ChevronDown className="h-3.5 w-3.5 text-[#6b6b6b] group-hover:text-[#a1a1a1] transition-colors shrink-0" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              className="w-52 border-[rgba(255,255,255,0.08)] bg-[#141414]/95 backdrop-blur-md text-[#ededed] shadow-2xl rounded-lg p-1"
+              align="start"
+            >
+              {organizations.map((org) => (
+                <DropdownMenuItem
+                  key={org.id}
+                  onClick={() => handleOrgChange(org.id)}
+                  className="text-xs text-[#a1a1a1] hover:text-[#ededed] hover:bg-[#1a1a1a] rounded-md px-2 py-1.5 cursor-pointer transition-colors focus:bg-[#1a1a1a] focus:text-[#ededed]"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-4 w-4 items-center justify-center rounded bg-indigo-600/20 text-indigo-400 text-[8px] font-bold uppercase">
+                      {org.name.slice(0, 2)}
+                    </div>
+                    <span>{org.name}</span>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <Link
             href="/orgs"
