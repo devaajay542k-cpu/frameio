@@ -5,10 +5,10 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
@@ -31,7 +31,6 @@ export async function DELETE(
       .from("videos")
       .select("*")
       .eq("id", id)
-      .eq("user_id", userId)
       .maybeSingle();
 
     if (fetchError) {
@@ -43,7 +42,18 @@ export async function DELETE(
       return NextResponse.json({ error: "Video not found" }, { status: 404 });
     }
 
-    // 2. Extract key from video_url
+    // 2. Perform permission check: inherited from project
+    const { hasPermission } = require("@/lib/auth-utils");
+    const canDelete = await hasPermission(userId, video.project_id, "DELETE_VIDEO", supabaseAdmin);
+    
+    // Fallback: If it has no project (e.g. legacy/mock videos), check if user is uploader
+    const isUploader = video.user_id === userId;
+    
+    if (!canDelete && !isUploader) {
+      return NextResponse.json({ error: "Unauthorized: You do not have permission to delete this video" }, { status: 403 });
+    }
+
+    // 3. Extract key from video_url
     const videoUrl = video.video_url || video.videoUrl;
     let key: string | null = null;
     console.log(videoUrl);
@@ -56,7 +66,7 @@ export async function DELETE(
       }
     }
 
-    // 3. Delete object from Cloudflare R2 bucket if key is found
+    // 4. Delete object from Cloudflare R2 bucket if key is found
     if (key) {
       try {
         const bucketName = process.env.R2_BUCKET_NAME!;
@@ -74,7 +84,7 @@ export async function DELETE(
       console.warn(`No R2 key found in video_url for video ID: ${id}`);
     }
 
-    // 4. Delete associated comments first to prevent foreign key constraint issues
+    // 5. Delete associated comments first to prevent foreign key constraint issues
     const { error: commentsDeleteError } = await supabaseAdmin
       .from("comments")
       .delete()
@@ -85,12 +95,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Failed to delete video comments" }, { status: 500 });
     }
 
-    // 5. Delete video record from Supabase table
+    // 6. Delete video record from Supabase table
     const { error: dbDeleteError } = await supabaseAdmin
       .from("videos")
       .delete()
-      .eq("id", id)
-      .eq("user_id", userId);
+      .eq("id", id);
 
     if (dbDeleteError) {
       console.error("Error deleting video from Supabase:", dbDeleteError);

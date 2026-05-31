@@ -1,7 +1,11 @@
 "use client";
 
-import { Folder, Users, Activity, Archive, Settings, Film, ShieldAlert, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Folder, Users, Building2, ChevronDown, Plus, Settings, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { useRouter, useParams, usePathname } from "next/navigation";
+import Link from "next/link";
 
 interface SidebarProps {
   className?: string;
@@ -9,89 +13,253 @@ interface SidebarProps {
   onItemSelect?: (item: string) => void;
 }
 
-export default function Sidebar({ className, activeItem = "projects", onItemSelect }: SidebarProps) {
-  const menuItems = [
-    { id: "projects", label: "My Projects", icon: Folder },
-    { id: "shared", label: "Shared with Me", icon: Users },
-    { id: "activity", label: "Team Activity", icon: Activity },
-    { id: "archives", label: "Archives", icon: Archive },
-    { id: "settings", label: "Settings", icon: Settings },
-  ];
+export default function Sidebar({ className }: SidebarProps) {
+  const router = useRouter();
+  const params = useParams();
+  const pathname = usePathname();
+
+  const orgIdParam = params?.organizationId as string;
+  const projectIdParam = params?.projectId as string;
+  const videoIdParam = params?.videoId as string;
+
+  const [userId, setUserId] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [activeOrg, setActiveOrg] = useState<any>(null);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingOrgs, setLoadingOrgs] = useState(true);
+
+  useEffect(() => {
+    async function getAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) setUserId(session.user.id);
+    }
+    getAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    async function fetchOrgs() {
+      try {
+        const { data, error } = await supabase
+          .from("organization_members")
+          .select("organization_id, role, organizations(*)")
+          .eq("user_id", userId);
+        if (error) throw error;
+        if (data) {
+          const orgList = data.map((item: any) => ({
+            ...item.organizations,
+            memberRole: item.role,
+          })).filter(Boolean);
+          setOrganizations(orgList);
+          if (orgList.length > 0) {
+            let active = orgList[0];
+            if (orgIdParam) {
+              const matched = orgList.find((o: any) => o.id === orgIdParam);
+              if (matched) active = matched;
+            } else if (projectIdParam) {
+              const { data: proj } = await supabase.from("projects").select("organization_id").eq("id", projectIdParam).maybeSingle();
+              if (proj) { const m = orgList.find((o: any) => o.id === proj.organization_id); if (m) active = m; }
+            } else if (videoIdParam) {
+              const { data: vid } = await supabase.from("videos").select("project_id").eq("id", videoIdParam).maybeSingle();
+              if (vid?.project_id) {
+                const { data: proj } = await supabase.from("projects").select("organization_id").eq("id", vid.project_id).maybeSingle();
+                if (proj) { const m = orgList.find((o: any) => o.id === proj.organization_id); if (m) active = m; }
+              }
+            } else {
+              const stored = localStorage.getItem("aether_active_org");
+              if (stored) { const m = orgList.find((o: any) => o.id === stored); if (m) active = m; }
+            }
+            setActiveOrg(active);
+            localStorage.setItem("aether_active_org", active.id);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingOrgs(false);
+      }
+    }
+    fetchOrgs();
+  }, [userId, orgIdParam, projectIdParam, videoIdParam]);
+
+  useEffect(() => {
+    if (!activeOrg?.id || !userId) return;
+    async function fetchProjects() {
+      try {
+        const { data: allProjects } = await supabase.from("projects").select("*").eq("organization_id", activeOrg.id).order("created_at", { ascending: false });
+        if (activeOrg.memberRole === "owner" || activeOrg.memberRole === "admin") {
+          setProjects(allProjects || []);
+        } else {
+          const { data: pm } = await supabase.from("project_members").select("project_id").eq("user_id", userId);
+          const ids = pm?.map((p: any) => p.project_id) || [];
+          setProjects((allProjects || []).filter((p: any) => ids.includes(p.id)));
+        }
+      } catch (err) { console.error(err); }
+    }
+    fetchProjects();
+  }, [activeOrg, userId]);
+
+  const handleOrgChange = (orgId: string) => {
+    const selected = organizations.find((o) => o.id === orgId);
+    if (selected) {
+      setActiveOrg(selected);
+      localStorage.setItem("aether_active_org", selected.id);
+      router.push(`/organizations/${selected.id}`);
+    }
+  };
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "?");
 
   return (
-    <aside className={cn("w-64 border-r border-zinc-800/80 bg-[#09090b] flex flex-col h-[calc(100vh-3.5rem)] sticky top-14", className)}>
-      <div className="flex-1 py-6 px-4 space-y-7">
-        
-        {/* Navigation Section */}
-        <div>
-          <h2 className="px-3 text-[10px] font-bold tracking-widest text-zinc-500 uppercase mb-3">
-            Workspace
-          </h2>
-          <nav className="space-y-1">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeItem === item.id;
+    <aside className={cn(
+      "w-56 border-r border-[rgba(255,255,255,0.07)] bg-[#0e0e0e] flex flex-col h-[calc(100vh-3rem)] sticky top-12",
+      className
+    )}>
 
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onItemSelect?.(item.id)}
-                  className={cn(
-                    "flex w-full items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
-                    isActive
-                      ? "bg-zinc-900 text-indigo-400 font-semibold"
-                      : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/40"
-                  )}
-                >
-                  <Icon className={cn("h-4.5 w-4.5", isActive ? "text-indigo-400" : "text-zinc-500")} />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Team Projects Section */}
-        <div>
-          <div className="flex items-center justify-between px-3 mb-3">
-            <h2 className="text-[10px] font-bold tracking-widest text-zinc-500 uppercase">
-              Recent Projects
-            </h2>
+      {/* Org Switcher */}
+      <div className="px-3 py-2 border-b border-[rgba(255,255,255,0.07)]">
+        {loadingOrgs ? (
+          <div className="h-7 rounded bg-[#1a1a1a] animate-pulse w-full" />
+        ) : activeOrg ? (
+          <div className="relative group">
+            <select
+              value={activeOrg.id}
+              onChange={(e) => handleOrgChange(e.target.value)}
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+            >
+              {organizations.map((org) => (
+                <option key={org.id} value={org.id} className="bg-[#141414] text-[#ededed]">
+                  {org.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-[#1a1a1a] transition-colors cursor-pointer">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-indigo-600/20 border border-indigo-500/20 text-indigo-400 font-bold text-[9px] uppercase">
+                  {activeOrg.name.slice(0, 2)}
+                </div>
+                <div className="text-left min-w-0">
+                  <p className="text-xs font-medium text-[#ededed] truncate leading-none">{activeOrg.name}</p>
+                </div>
+              </div>
+              <ChevronDown className="h-3.5 w-3.5 text-[#6b6b6b] shrink-0" />
+            </div>
           </div>
-          <div className="space-y-1">
-            <button className="flex w-full items-center gap-3 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/40 rounded-lg text-left transition-colors">
-              <span className="h-2 w-2 rounded-full bg-violet-500" />
-              <span className="truncate">Tears of Steel Movie</span>
-            </button>
-            <button className="flex w-full items-center gap-3 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/40 rounded-lg text-left transition-colors">
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
-              <span className="truncate">Sintel Promos</span>
-            </button>
-            <button className="flex w-full items-center gap-3 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/40 rounded-lg text-left transition-colors">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span className="truncate">Animation Tests</span>
-            </button>
-          </div>
-        </div>
-
+        ) : (
+          <Link
+            href="/orgs"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[#6b6b6b] hover:text-[#ededed] hover:bg-[#1a1a1a] transition-colors text-xs"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New organization
+          </Link>
+        )}
       </div>
 
-      {/* Footer Banner */}
-      <div className="p-4 border-t border-zinc-800/60 bg-[#121214]/20">
-        <div className="p-3.5 rounded-xl border border-zinc-800/80 bg-zinc-950 flex flex-col gap-2 shadow-inner">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4.5 w-4.5 text-amber-400" />
-            <span className="text-xs font-semibold text-zinc-200">Aether Pro Plan</span>
-          </div>
-          <p className="text-[11px] text-zinc-500 leading-normal">
-            Enable advanced frame controls, 4K rendering reviews, and multi-user sync.
-          </p>
-          <button className="w-full mt-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-semibold py-1.5 px-3 rounded-lg border border-zinc-800/60 hover:border-zinc-700 transition-all duration-200">
-            Upgrade Workspace
-          </button>
+      {/* Nav */}
+      <div className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+
+        {/* Main nav group */}
+        <div className="space-y-0.5">
+          <NavItem
+            href="/orgs"
+            icon={LayoutDashboard}
+            label="Dashboard"
+            active={isActive("/orgs")}
+          />
+          {activeOrg && (
+            <>
+              <NavItem
+                href={`/organizations/${activeOrg.id}`}
+                icon={Folder}
+                label="Projects"
+                active={isActive(`/organizations/${activeOrg.id}`)}
+              />
+              <NavItem
+                href={`/organizations/${activeOrg.id}?tab=members`}
+                icon={Users}
+                label="Members"
+                active={pathname === `/organizations/${activeOrg.id}` && false}
+              />
+              {(activeOrg.memberRole === "owner" || activeOrg.memberRole === "admin") && (
+                <NavItem
+                  href={`/organizations/${activeOrg.id}?tab=invites`}
+                  icon={Settings}
+                  label="Settings"
+                  active={false}
+                />
+              )}
+            </>
+          )}
         </div>
+
+        {/* Projects group */}
+        {projects.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between px-2 mb-1">
+              <span className="text-[11px] font-medium text-[#6b6b6b] uppercase tracking-wider">Projects</span>
+              {activeOrg && (activeOrg.memberRole === "owner" || activeOrg.memberRole === "admin") && (
+                <Link href={`/organizations/${activeOrg.id}`} className="text-[#6b6b6b] hover:text-[#ededed] transition-colors">
+                  <Plus className="h-3 w-3" />
+                </Link>
+              )}
+            </div>
+            <div className="space-y-0.5">
+              {projects.map((project) => {
+                const isProjActive = pathname === `/projects/${project.id}` || pathname.startsWith(`/projects/${project.id}/`);
+                return (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors",
+                      isProjActive
+                        ? "bg-[#1a1a1a] text-[#ededed] font-medium"
+                        : "text-[#6b6b6b] hover:text-[#a1a1a1] hover:bg-[#141414]"
+                    )}
+                  >
+                    <span className={cn(
+                      "h-1.5 w-1.5 rounded-full shrink-0",
+                      isProjActive ? "bg-indigo-400" : "bg-[#333]"
+                    )} />
+                    <span className="truncate">{project.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Org switcher footer */}
+      {organizations.length > 0 && (
+        <div className="px-2 py-3 border-t border-[rgba(255,255,255,0.07)]">
+          <Link
+            href="/orgs"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-[#6b6b6b] hover:text-[#a1a1a1] hover:bg-[#141414] transition-colors text-xs"
+          >
+            <Building2 className="h-3.5 w-3.5 shrink-0" />
+            <span>All organizations</span>
+          </Link>
+        </div>
+      )}
     </aside>
+  );
+}
+
+function NavItem({ href, icon: Icon, label, active }: { href: string; icon: any; label: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex w-full items-center gap-2.5 px-2 py-1.5 text-xs rounded-md transition-colors",
+        active
+          ? "bg-[#1a1a1a] text-[#ededed] font-medium"
+          : "text-[#6b6b6b] hover:text-[#a1a1a1] hover:bg-[#141414]"
+      )}
+    >
+      <Icon className={cn("h-3.5 w-3.5 shrink-0", active ? "text-[#ededed]" : "text-[#6b6b6b]")} />
+      {label}
+    </Link>
   );
 }

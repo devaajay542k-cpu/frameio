@@ -25,4 +25,5 @@ export interface Video {
   duration: number; // in seconds
   createdAt: string;
   commentsCount: number;
+  project_id?: string;
 }

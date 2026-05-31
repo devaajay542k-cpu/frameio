@@ -12,11 +12,12 @@ interface UploadModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  projectId?: string;
 }
 
 type UploadStatus = "idle" | "dragging" | "uploading" | "processing" | "done" | "error";
 
-export default function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
+export default function UploadModal({ open, onClose, onSuccess, projectId }: UploadModalProps) {
   const [status, setStatus] = useState<UploadStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -92,7 +93,9 @@ export default function UploadModal({ open, onClose, onSuccess }: UploadModalPro
           title: file.name.replace(/\.[^/.]+$/, ""), // remove extension for clean title
           video_url: videoUrl,
           created_at: new Date().toISOString(),
-          user_id: userId
+          user_id: userId,
+          project_id: projectId || null,
+          status: "ready", // mark as ready upon upload
         });
 
       if (dbError) {

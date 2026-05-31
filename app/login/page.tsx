@@ -11,11 +11,40 @@ import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [showResend, setShowResend] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const handleResendVerification = async () => {
+    if (!email) return;
+    setResending(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: email,
+      });
+      if (error) {
+        setErrorMsg(error.message);
+      } else {
+        setSuccessMsg("Verification email resent successfully! Please check your inbox.");
+        setShowResend(false);
+      }
+    } catch (err) {
+      setErrorMsg("Failed to resend verification email.");
+      console.error(err);
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +52,8 @@ export default function LoginPage() {
 
     setIsLoading(true);
     setErrorMsg(null);
+    setSuccessMsg(null);
+    setShowResend(false);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -31,7 +62,16 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setErrorMsg(error.message);
+        if (
+          error.message.toLowerCase().includes("email not confirmed") ||
+          error.message.toLowerCase().includes("confirm your email") ||
+          error.message.toLowerCase().includes("email_not_confirmed")
+        ) {
+          setErrorMsg("Please verify your email address before signing in. Check your inbox for the verification link.");
+          setShowResend(true);
+        } else {
+          setErrorMsg(error.message);
+        }
       } else if (data.session) {
         router.push("/");
       }
@@ -43,9 +83,51 @@ export default function LoginPage() {
     }
   };
 
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password || !fullName.trim()) return;
+
+    setIsLoading(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        setErrorMsg(error.message);
+      } else {
+        if (data.session) {
+          // If auto-logged in
+          router.push("/");
+        } else {
+          setSuccessMsg(
+            "Account created successfully! Please check your email for a confirmation link or sign in."
+          );
+          setIsSignUp(false);
+          setPassword("");
+        }
+      }
+    } catch (err) {
+      setErrorMsg("An unexpected error occurred during sign up.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
     setErrorMsg(null);
+    setSuccessMsg(null);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -92,17 +174,37 @@ export default function LoginPage() {
         {/* Card Container */}
         <Card className="border border-zinc-800/80 bg-[#121214]/60 backdrop-blur-xl shadow-2xl rounded-2xl">
           <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-xl text-center text-zinc-100 font-semibold">Sign in to your account</CardTitle>
+            <CardTitle className="text-xl text-center text-zinc-100 font-semibold">
+              {isSignUp ? "Create a new account" : "Sign in to your account"}
+            </CardTitle>
             <CardDescription className="text-center text-zinc-500 text-xs">
-              Review and grade videos with your production team
+              {isSignUp
+                ? "Start reviewing and grading videos with your production team"
+                : "Review and grade videos with your production team"}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             {errorMsg && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
-                {errorMsg}
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400 space-y-2">
+                <p>{errorMsg}</p>
+                {showResend && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resending}
+                    className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold hover:underline bg-transparent border-0 cursor-pointer p-0 block mt-1"
+                  >
+                    {resending ? "Resending..." : "Resend verification email"}
+                  </button>
+                )}
               </div>
             )}
+            {successMsg && (
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
+                {successMsg}
+              </div>
+            )}
+            
             {/* Google Sign In */}
             <Button
               variant="outline"
@@ -118,21 +220,40 @@ export default function LoginPage() {
                   <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
                 </svg>
               )}
-              Continue with Google
+              {isSignUp ? "Sign up with Google" : "Continue with Google"}
             </Button>
 
+
             {/* Separator */}
-            <div className="relative my-2">
+            <div className="relative my-1">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-zinc-800" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-[#121214] px-2 text-zinc-500 font-medium">Or continue with</span>
+                <span className="bg-[#121214] px-2 text-zinc-500 font-medium">
+                  {isSignUp ? "Or sign up with credentials" : "Or continue with credentials"}
+                </span>
               </div>
             </div>
 
-            {/* Credentials Login Form */}
-            <form onSubmit={handleLogin} className="space-y-4">
+            {/* Credentials Form */}
+            <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
+              {isSignUp && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName" className="text-zinc-400 text-xs font-semibold">Full name</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="Jane Doe"
+                    disabled={isLoading || isGoogleLoading}
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="bg-zinc-900/50 border-zinc-800/80 text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-700 focus:ring-1 focus:ring-zinc-700 h-10 rounded-lg text-sm"
+                    required
+                  />
+                </div>
+              )}
+              
               <div className="space-y-1.5">
                 <Label htmlFor="email" className="text-zinc-400 text-xs font-semibold">Email address</Label>
                 <Input
@@ -149,7 +270,9 @@ export default function LoginPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password" className="text-zinc-400 text-xs font-semibold">Password</Label>
-                  <a href="#" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline">Forgot?</a>
+                  {!isSignUp && (
+                    <a href="#" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline">Forgot?</a>
+                  )}
                 </div>
                 <Input
                   id="password"
@@ -164,20 +287,33 @@ export default function LoginPage() {
               </div>
 
               <Button
+                id="email-submit-btn"
                 type="submit"
-                disabled={isLoading || isGoogleLoading || !email || !password}
+                disabled={isLoading || isGoogleLoading || !email || !password || (isSignUp && !fullName.trim())}
                 className="w-full h-10 bg-indigo-600 hover:bg-indigo-500 text-zinc-50 font-medium rounded-lg shadow-lg shadow-indigo-600/10 hover:shadow-indigo-500/20 transition-all duration-200"
               >
                 {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin text-zinc-100" />
                 ) : null}
-                Sign In with Email
+                {isSignUp ? "Sign Up with Email" : "Sign In with Email"}
               </Button>
             </form>
           </CardContent>
           <CardFooter className="pt-2 pb-6 flex flex-wrap justify-between items-center text-xs text-zinc-500 border-t border-zinc-800/50 mt-4">
-            <span className="mt-2">Don&apos;t have an account?</span>
-            <a href="#" className="text-zinc-300 hover:text-zinc-100 hover:underline font-medium mt-2">Create one now</a>
+            <span className="mt-2">
+              {isSignUp ? "Already have an account?" : "Don't have an account?"}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setErrorMsg(null);
+                setSuccessMsg(null);
+              }}
+              className="text-zinc-300 hover:text-zinc-100 hover:underline font-medium mt-2 bg-transparent border-0 cursor-pointer p-0"
+            >
+              {isSignUp ? "Sign in now" : "Create one now"}
+            </button>
           </CardFooter>
         </Card>
       </div>

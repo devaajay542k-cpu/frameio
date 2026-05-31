@@ -1,9 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Film, Search, Bell, LogOut, User as UserIcon, Settings, Menu, Plus } from "lucide-react";
+import { Film, Bell, LogOut, User as UserIcon, Settings, Menu, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -18,7 +17,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface NavbarProps {
-  onUploadClick: () => void;
+  onUploadClick?: () => void;
   onMobileMenuClick?: () => void;
 }
 
@@ -40,7 +39,7 @@ export default function Navbar({ onUploadClick, onMobileMenuClick }: NavbarProps
         setUser({
           name: metadata.full_name || metadata.name || session.user.email?.split("@")[0] || "User",
           email: session.user.email || "",
-          avatarUrl: metadata.avatar_url || "",
+          avatarUrl: metadata.avatar_url || undefined,
         });
       }
     }
@@ -52,144 +51,120 @@ export default function Navbar({ onUploadClick, onMobileMenuClick }: NavbarProps
         setUser({
           name: metadata.full_name || metadata.name || session.user.email?.split("@")[0] || "User",
           email: session.user.email || "",
-          avatarUrl: metadata.avatar_url || "",
+          avatarUrl: metadata.avatar_url || undefined,
         });
       } else {
         setUser(null);
       }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => { subscription.unsubscribe(); };
   }, []);
 
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
       router.push("/login");
-    } catch (err) {
-      console.error("Error signing out:", err);
+    } catch {
       router.push("/login");
     }
   };
 
   const displayName = user?.name || "User";
   const displayEmail = user?.email || "";
-  const displayAvatar = user?.avatarUrl || "";
-  const initials = displayName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2) || "U";
+  const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U";
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-zinc-800/80 bg-[#09090b]/80 backdrop-blur-md">
-      <div className="flex h-14 items-center justify-between px-4 md:px-6">
-        
-        {/* Left Section: Logo & Toggle */}
+    <header className="sticky top-0 z-40 w-full h-12 border-b border-[rgba(255,255,255,0.07)] bg-[#0e0e0e] flex items-center">
+      <div className="flex h-full w-full items-center justify-between px-4">
+
+        {/* Left: Logo */}
         <div className="flex items-center gap-3">
           {onMobileMenuClick && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
+            <button
               onClick={onMobileMenuClick}
+              className="md:hidden p-1.5 rounded-md text-[#6b6b6b] hover:text-[#ededed] hover:bg-[#1a1a1a] transition-colors"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            onClick={() => router.push("/")}
+            className="flex items-center gap-2 group"
+          >
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-600">
+              <Film className="h-3.5 w-3.5 text-white" />
+            </div>
+            <span className="text-sm font-semibold text-[#ededed] tracking-tight">
+              Aether
+            </span>
+          </button>
+
+          {/* Breadcrumb separator style */}
+          <span className="text-[#333] text-base font-light select-none hidden sm:block">/</span>
+        </div>
+
+        {/* Right: actions */}
+        <div className="flex items-center gap-1">
+          {onUploadClick && (
+            <Button
+              size="sm"
+              onClick={onUploadClick}
+              className="h-7 px-3 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-md shadow-none border-0 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Upload
             </Button>
           )}
 
-          <div 
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2.5 cursor-pointer group"
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 via-indigo-600 to-amber-600 p-0.5 shadow-md shadow-indigo-500/5 transition-transform duration-300 group-hover:scale-105">
-              <div className="flex h-full w-full items-center justify-center rounded-[7px] bg-[#09090b]">
-                <Film className="h-4.5 w-4.5 text-indigo-400" />
-              </div>
-            </div>
-            <span className="font-sans font-bold tracking-tight text-zinc-100 text-base">
-              AETHER
-            </span>
-          </div>
-        </div>
+          <button className="p-1.5 rounded-md text-[#6b6b6b] hover:text-[#ededed] hover:bg-[#1a1a1a] transition-colors">
+            <Bell className="h-4 w-4" />
+          </button>
 
-        {/* Middle Section: Search Bar (Desktop) */}
-        <div className="hidden md:flex relative max-w-md w-full mx-8">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-          <Input
-            type="search"
-            placeholder="Search videos, files, folders..."
-            className="w-full bg-zinc-900/50 border-zinc-800/80 text-zinc-100 pl-9 pr-4 placeholder:text-zinc-600 focus:border-zinc-700 focus:ring-1 focus:ring-zinc-700 h-9 rounded-lg text-sm"
-          />
-        </div>
-
-        {/* Right Section: Upload, Actions, User */}
-        <div className="flex items-center gap-3">
-          
-          <Button
-            size="sm"
-            onClick={onUploadClick}
-            className="bg-indigo-600 hover:bg-indigo-500 text-zinc-50 font-medium h-9 px-4 rounded-lg shadow-md shadow-indigo-600/10 hover:shadow-indigo-500/20 transition-all duration-200"
-          >
-            <Plus className="mr-1.5 h-4 w-4" />
-            Upload
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 h-9 w-9 rounded-lg"
-          >
-            <Bell className="h-4.5 w-4.5" />
-          </Button>
-
-          {/* User Profile Dropdown */}
+          {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button
-                  variant="ghost"
-                  className="relative h-9 w-9 rounded-full border border-zinc-800/80 p-0 hover:bg-zinc-800/20"
-                />
+                <button className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-[#1a1a1a] transition-colors group" />
               }
             >
-              <Avatar className="h-8.5 w-8.5">
-                <AvatarImage src={displayAvatar} alt={displayName} />
-                <AvatarFallback className="bg-indigo-900/40 text-indigo-300 text-xs">{initials}</AvatarFallback>
+              <Avatar className="h-6 w-6 rounded-full">
+                {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={displayName} />}
+                <AvatarFallback className="bg-indigo-600/20 text-indigo-400 text-[10px] font-bold rounded-full">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
+              <ChevronDown className="h-3 w-3 text-[#6b6b6b] group-hover:text-[#a1a1a1] transition-colors" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 border-zinc-800 bg-[#121214] text-zinc-200" align="end">
+            <DropdownMenuContent
+              className="w-56 border-[rgba(255,255,255,0.08)] bg-[#141414] text-[#ededed] shadow-xl rounded-lg p-1"
+              align="end"
+            >
+              <div className="px-2 py-1.5 mb-1">
+                <p className="text-xs font-medium text-[#ededed] truncate">{displayName}</p>
+                <p className="text-[11px] text-[#6b6b6b] truncate mt-0.5">{displayEmail}</p>
+              </div>
+              <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.07)] my-1" />
               <DropdownMenuGroup>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium text-zinc-200 leading-none">{displayName}</p>
-                    <p className="text-xs text-zinc-500 leading-none">{displayEmail}</p>
-                  </div>
-                </DropdownMenuLabel>
+                <DropdownMenuItem className="text-xs text-[#a1a1a1] hover:text-[#ededed] hover:bg-[#1a1a1a] rounded-md px-2 py-1.5 cursor-pointer transition-colors focus:bg-[#1a1a1a] focus:text-[#ededed]">
+                  <UserIcon className="mr-2 h-3.5 w-3.5" />
+                  Account
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-xs text-[#a1a1a1] hover:text-[#ededed] hover:bg-[#1a1a1a] rounded-md px-2 py-1.5 cursor-pointer transition-colors focus:bg-[#1a1a1a] focus:text-[#ededed]">
+                  <Settings className="mr-2 h-3.5 w-3.5" />
+                  Settings
+                </DropdownMenuItem>
               </DropdownMenuGroup>
-              <DropdownMenuSeparator className="bg-zinc-800/60" />
-              <DropdownMenuItem className="hover:bg-zinc-800/60 cursor-pointer focus:bg-zinc-800/60 focus:text-zinc-100">
-                <UserIcon className="mr-2 h-4 w-4 text-zinc-400" />
-                <span>My Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-zinc-800/60 cursor-pointer focus:bg-zinc-800/60 focus:text-zinc-100">
-                <Settings className="mr-2 h-4 w-4 text-zinc-400" />
-                <span>Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-zinc-800/60" />
-              <DropdownMenuItem 
+              <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.07)] my-1" />
+              <DropdownMenuItem
                 onClick={handleSignOut}
-                className="hover:bg-red-950/20 hover:text-red-400 text-red-400 cursor-pointer focus:bg-red-950/20 focus:text-red-400"
+                className="text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md px-2 py-1.5 cursor-pointer transition-colors focus:bg-red-500/10 focus:text-red-300"
               >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Sign Out</span>
+                <LogOut className="mr-2 h-3.5 w-3.5" />
+                Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
         </div>
       </div>
     </header>
