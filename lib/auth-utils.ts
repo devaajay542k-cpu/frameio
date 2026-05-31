@@ -1,3 +1,4 @@
+import { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 export type Role = "owner" | "admin" | "editor" | "viewer";
@@ -51,7 +52,7 @@ export const PERMISSION_MATRIX: Record<Role, PermissionAction[]> = {
 export async function getEffectiveRole(
   userId: string,
   projectIdOrOrgId: string,
-  client: any = supabase
+  client: SupabaseClient = supabase
 ): Promise<Role | null> {
   if (!userId || !projectIdOrOrgId) return null;
 
@@ -118,7 +119,7 @@ export async function hasPermission(
   userId: string,
   projectIdOrOrgId: string,
   action: PermissionAction,
-  client: any = supabase
+  client: SupabaseClient = supabase
 ): Promise<boolean> {
   const role = await getEffectiveRole(userId, projectIdOrOrgId, client);
   if (!role) return false;

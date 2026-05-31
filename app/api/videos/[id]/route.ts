@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { r2 } from "@/lib/r2";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { hasPermission } from "@/lib/auth-utils";
 
 export async function DELETE(
   request: Request,
@@ -43,7 +44,6 @@ export async function DELETE(
     }
 
     // 2. Perform permission check: inherited from project
-    const { hasPermission } = require("@/lib/auth-utils");
     const canDelete = await hasPermission(userId, video.project_id, "DELETE_VIDEO", supabaseAdmin);
     
     // Fallback: If it has no project (e.g. legacy/mock videos), check if user is uploader
