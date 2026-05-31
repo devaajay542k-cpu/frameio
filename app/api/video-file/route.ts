@@ -31,11 +31,20 @@ export async function GET(request: Request) {
     const isPartial = !!response.ContentRange;
     const status = isPartial ? 206 : 200;
 
+    const isDownload = searchParams.get("download") === "true";
+
     const headers: Record<string, string> = {
       "Content-Type": response.ContentType || "video/mp4",
       "Accept-Ranges": "bytes",
       "Cache-Control": "public, max-age=31536000, immutable",
     };
+
+    if (isDownload) {
+      const paramFilename = searchParams.get("filename");
+      const filename = paramFilename || key.split("/").pop() || "video.mp4";
+      const safeFilename = encodeURIComponent(filename).replace(/['()]/g, escape).replace(/\*/g, "%2A");
+      headers["Content-Disposition"] = `attachment; filename="${filename.replace(/"/g, '\\"')}"; filename*=UTF-8''${safeFilename}`;
+    }
 
     if (response.ContentLength) {
       headers["Content-Length"] = response.ContentLength.toString();

@@ -410,6 +410,20 @@ export default function VideoReviewPage() {
     }
   };
 
+  // Download video version file
+  const handleDownload = () => {
+    if (!selectedVersion || !video) return;
+    const extension = selectedVersion.storage_path.split(".").pop() || "mp4";
+    const filename = `${video.title} - Version ${selectedVersion.version_number}.${extension}`;
+    const downloadUrl = `/api/video-file?key=${encodeURIComponent(selectedVersion.storage_path)}&download=true&filename=${encodeURIComponent(filename)}`;
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
@@ -520,7 +534,9 @@ export default function VideoReviewPage() {
             <Button
               variant="ghost"
               size="icon"
+              onClick={handleDownload}
               className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 h-8.5 w-8.5 rounded-lg"
+              title="Download video"
             >
               <Download className="h-4 w-4" />
             </Button>
