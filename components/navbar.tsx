@@ -106,16 +106,6 @@ export default function Navbar({ onUploadClick, onMobileMenuClick }: NavbarProps
 
         {/* Right: actions */}
         <div className="flex items-center gap-1">
-          {onUploadClick && (
-            <Button
-              size="sm"
-              onClick={onUploadClick}
-              className="h-7 px-3 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-md shadow-none border-0 transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Upload
-            </Button>
-          )}
 
           <button className="p-1.5 rounded-md text-[#6b6b6b] hover:text-[#ededed] hover:bg-[#1a1a1a] transition-colors">
             <Bell className="h-4 w-4" />
