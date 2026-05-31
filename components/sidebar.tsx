@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Folder, Users, Building2, ChevronDown, Plus, Settings, LayoutDashboard } from "lucide-react";
+import { Folder, Users, Building2, ChevronDown, Plus, Settings, LayoutDashboard, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { useRouter, useParams, usePathname } from "next/navigation";
+import { useRouter, useParams, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   DropdownMenu,
@@ -23,6 +23,8 @@ export default function Sidebar({ className }: SidebarProps) {
   const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab");
 
   const orgIdParam = params?.organizationId as string;
   const projectIdParam = params?.projectId as string;
@@ -191,20 +193,20 @@ export default function Sidebar({ className }: SidebarProps) {
                 href={`/organizations/${activeOrg.id}`}
                 icon={Folder}
                 label="Projects"
-                active={isActive(`/organizations/${activeOrg.id}`)}
+                active={pathname === `/organizations/${activeOrg.id}` && (currentTab === "projects" || !currentTab)}
               />
               <NavItem
                 href={`/organizations/${activeOrg.id}?tab=members`}
                 icon={Users}
                 label="Members"
-                active={pathname === `/organizations/${activeOrg.id}` && false}
+                active={pathname === `/organizations/${activeOrg.id}` && currentTab === "members"}
               />
               {(activeOrg.memberRole === "owner" || activeOrg.memberRole === "admin") && (
                 <NavItem
                   href={`/organizations/${activeOrg.id}?tab=invites`}
-                  icon={Settings}
-                  label="Settings"
-                  active={false}
+                  icon={Mail}
+                  label="Pending Invites"
+                  active={pathname === `/organizations/${activeOrg.id}` && currentTab === "invites"}
                 />
               )}
             </>
